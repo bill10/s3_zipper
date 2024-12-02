@@ -1,10 +1,11 @@
 # S3 Folder Zipper
 
 ## Overview
-This Python script downloads multiple folders from an AWS S3 bucket, combines them into a single zip file, and uploads the zip file back to S3.
+This Python script downloads multiple folders and/or individual files from an AWS S3 bucket, combines them into a single zip file, and uploads the zip file back to S3.
 
 ## Features
 - Download multiple S3 folders by prefix
+- Download individual S3 objects directly
 - Preserve folder structure in zip file
 - Upload combined zip file to S3
 - YAML-based configuration
@@ -57,9 +58,10 @@ aws:
   region: us-east-1  # Optional
 
 zip_config:
-  source_prefixes:  # List of S3 folder prefixes to download
-    - "data/folder1/"
-    - "data/folder2/subfolder/"
+  source_prefixes:  # List of S3 folders or files to download
+    - "data/folder1/"           # Downloads all files in this folder
+    - "data/specific-file.txt"  # Downloads this specific file
+    - "images/photos/"          # Downloads all files in this folder
   output_zip_name: output.zip
   destination_prefix: "processed/data/"  # Optional, defaults to root of bucket
   local_directory: "./output"  # Local directory to store zip files
@@ -83,7 +85,9 @@ logging:
 - `region`: AWS region (optional)
 
 #### Zip Config Section
-- `source_prefixes`: List of S3 folder prefixes to download (must end with '/')
+- `source_prefixes`: List of S3 folders or files to download:
+  - For folders: Add a trailing slash (e.g., "folder/")
+  - For individual files: Don't add a trailing slash (e.g., "folder/file.txt")
 - `output_zip_name`: Name of the output zip file
 - `destination_prefix`: Prefix for the output zip file in the destination bucket (optional)
 - `local_directory`: Local directory for storing zip files

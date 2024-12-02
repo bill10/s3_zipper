@@ -82,11 +82,6 @@ class S3FolderZipper:
                 if field not in config[section]:
                     raise ValueError(f"Missing required field: {section}.{field}")
 
-        # Ensure source prefixes end with '/'
-        for i, prefix in enumerate(config['zip_config']['source_prefixes']):
-            if not prefix.endswith('/'):
-                config['zip_config']['source_prefixes'][i] = prefix + '/'
-
         return config
 
     def _setup_logging(self):
@@ -114,6 +109,25 @@ class S3FolderZipper:
     def _list_s3_files(self, prefix):
         """List files in an S3 prefix"""
         files = []
+        
+        # If prefix doesn't end with '/', treat it as an individual object
+        if not prefix.endswith('/'):
+            try:
+                # Check if the object exists
+                self.s3_client.head_object(
+                    Bucket=self.config['aws']['source_bucket'],
+                    Key=prefix
+                )
+                files.append(prefix)
+                return files
+            except ClientError as e:
+                if e.response['Error']['Code'] == '404':
+                    self.logger.warning(f"Object not found: {prefix}")
+                else:
+                    raise
+                return files
+
+        # If prefix ends with '/', treat it as a folder
         paginator = self.s3_client.get_paginator('list_objects_v2')
         pages = paginator.paginate(Bucket=self.config['aws']['source_bucket'], Prefix=prefix)
         
@@ -137,13 +151,17 @@ class S3FolderZipper:
         skipped_files = []
         
         for file in files:
-            # Extract the lowest level folder name and file name
-            path_parts = Path(file).parts
-            if len(path_parts) > 1:
-                # Use only the last folder name and file name for the local path
-                local_path = os.path.join(path_parts[-2], path_parts[-1])
+            # For individual objects (not in folders), use just the filename
+            if '/' not in file or file.count('/') == 1 and file.endswith('/'):
+                local_path = os.path.basename(file)
             else:
-                local_path = path_parts[-1]
+                # Extract the lowest level folder name and file name
+                path_parts = Path(file).parts
+                if len(path_parts) > 1:
+                    # Use only the last folder name and file name for the local path
+                    local_path = os.path.join(path_parts[-2], path_parts[-1])
+                else:
+                    local_path = path_parts[-1]
             
             # Construct full local file path
             local_file_path = os.path.join(local_dir, local_path)
