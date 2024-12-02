@@ -54,51 +54,52 @@ Create a YAML configuration file (e.g., `config.yaml`) with your settings:
 aws:
   source_bucket: source-bucket-name
   destination_bucket: destination-bucket-name
-  region: us-west-2  # Optional, can be set in .env file
+  region: us-east-1  # Optional
 
 zip_config:
   source_prefixes:  # List of S3 folder prefixes to download
-    - "path/to/folder1/"
-    - "path/to/folder2/"
-    - "projects/folder3/"
-  output_zip_name: combined_folders.zip  # Name of the output zip file
-  destination_prefix: "zipped-folders/"  # Optional, defaults to root of bucket
+    - "data/folder1/"
+    - "data/folder2/subfolder/"
+  output_zip_name: output.zip
+  destination_prefix: "processed/data/"  # Optional, defaults to root of bucket
+  local_directory: "./output"  # Local directory to store zip files
 
 options:
-  compression_level: 9  # ZIP compression level (1-9)
-  delete_local_after: true  # Clean up temporary files
-  skip_existing: true  # Skip if zip exists in destination
+  compression_level: 9
+  delete_local_after: true
+  overwrite_s3: false  # Set to true to overwrite existing files in S3
 
 logging:
-  level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
   format: "%(asctime)s - %(levelname)s - %(message)s"
   file: logs/s3_zipper.log  # Optional
 ```
 
-## Command Line Arguments
-- `-c, --config`: Path to YAML configuration file (default: `config.yaml` in current directory)
+### Configuration Details
 
-## Configuration Options
-
-### AWS Section
+#### AWS Section
 - `source_bucket`: Source S3 bucket name (required)
 - `destination_bucket`: Destination S3 bucket name (required)
-- `region`: AWS region (optional, can be set in .env file)
+- `region`: AWS region (optional)
 
-### Zip Config Section
+#### Zip Config Section
 - `source_prefixes`: List of S3 folder prefixes to download (must end with '/')
 - `output_zip_name`: Name of the output zip file
-- `destination_prefix`: Prefix for the output zip file in the destination bucket
+- `destination_prefix`: Prefix for the output zip file in the destination bucket (optional)
+- `local_directory`: Local directory for storing zip files
 
-### Options Section
-- `compression_level`: ZIP compression level (1-9)
+#### Options Section
+- `compression_level`: ZIP compression level (1-9, higher = better compression)
 - `delete_local_after`: Clean up local files after processing
-- `skip_existing`: Skip if zip exists in destination
+- `overwrite_s3`: Whether to overwrite existing files in S3
 
-### Logging Section
+#### Logging Section
 - `level`: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `format`: Log message format
 - `file`: Optional log file path
+
+## Command Line Arguments
+- `-c, --config`: Path to YAML configuration file (default: `config.yaml` in current directory)
 
 ## Security Considerations
 - Store AWS credentials in .env file (never commit to version control)
