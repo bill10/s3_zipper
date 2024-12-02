@@ -5,6 +5,8 @@ import tempfile
 import logging
 import yaml
 import argparse
+import time
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from botocore.exceptions import ClientError
@@ -284,6 +286,8 @@ class S3FolderZipper:
     def process_folders(self):
         """Main process to download folders, create zip, and upload"""
         try:
+            start_time = time.time()
+            
             # Get all files from source prefixes
             all_files = []
             for prefix in self.config['zip_config']['source_prefixes']:
@@ -296,7 +300,14 @@ class S3FolderZipper:
                 logging.error("No files found in any of the specified prefixes")
                 return
 
-            logging.info(f"Found {len(all_files)} files to process")
+            total_size = sum(
+                self.s3_client.head_object(
+                    Bucket=self.config['aws']['source_bucket'],
+                    Key=file
+                )['ContentLength'] for file in all_files
+            )
+            
+            logging.info(f"Found {len(all_files)} files to process, total size: {total_size / (1024*1024):.2f} MB")
             
             # In dry run mode, just list what would be processed
             if self.dry_run:
@@ -309,13 +320,36 @@ class S3FolderZipper:
             os.makedirs(local_dir, exist_ok=True)
             
             # Download files (will skip existing ones)
+            download_start = time.time()
             downloaded_files = self._download_files(all_files, local_dir)
+            download_time = time.time() - download_start
+            logging.info(f"Download completed in {download_time:.2f} seconds")
             
             # Create zip file (will use existing if valid)
+            zip_start = time.time()
             zip_path = self._create_zip(local_dir)
+            zip_time = time.time() - zip_start
+            zip_size = os.path.getsize(zip_path) / (1024*1024)  # Convert to MB
+            logging.info(f"Zip creation completed in {zip_time:.2f} seconds. Zip size: {zip_size:.2f} MB")
             
             # Upload zip file (will check if exists in S3)
+            upload_start = time.time()
             self._upload_zip(zip_path)
+            upload_time = time.time() - upload_start
+            logging.info(f"Upload completed in {upload_time:.2f} seconds")
+            
+            # Log total time and summary
+            total_time = time.time() - start_time
+            logging.info("\n=== Operation Summary ===")
+            logging.info(f"Total files processed: {len(all_files)}")
+            logging.info(f"Total input size: {total_size / (1024*1024):.2f} MB")
+            logging.info(f"Final zip size: {zip_size:.2f} MB")
+            logging.info(f"Compression ratio: {(1 - (zip_size * 1024*1024) / total_size) * 100:.1f}%")
+            logging.info(f"Download time: {download_time:.2f} seconds")
+            logging.info(f"Zip creation time: {zip_time:.2f} seconds")
+            logging.info(f"Upload time: {upload_time:.2f} seconds")
+            logging.info(f"Total time: {total_time:.2f} seconds")
+            logging.info("======================\n")
             
             # Clean up if configured
             if self.config['options'].get('delete_local_after', True):
